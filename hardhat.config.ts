@@ -119,6 +119,7 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: 300,
       },
+      viaIR: true,
     },
   },
   typechain: {
