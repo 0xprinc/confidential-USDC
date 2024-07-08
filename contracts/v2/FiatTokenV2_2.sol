@@ -24,7 +24,10 @@ import { FiatTokenV1 } from "../v1/FiatTokenV1.sol"; // solhint-disable-line no-
 import { FiatTokenV2 } from "./FiatTokenV2.sol"; // solhint-disable-line no-unused-import
 import { FiatTokenV2_1 } from "./FiatTokenV2_1.sol";
 import { EIP712 } from "../util/EIP712.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import { IEncryptedERC20 } from "../interface/IEncryptedERC20.sol";
+import "fhevm/lib/TFHE.sol";
+
 
 // solhint-disable func-name-mixedcase
 
@@ -93,11 +96,11 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
     function permit(
         address owner,
         address spender,
-        uint256 value,
+        bytes calldata value,
         uint256 deadline,
         bytes memory signature
     ) external whenNotPaused {
-        _permit(owner, spender, value, deadline, signature);
+        _permit(owner, spender, TFHE.asEuint32(value), deadline, signature);
     }
 
     /**
@@ -114,13 +117,13 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
     function transferWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        bytes calldata value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
         bytes memory signature
     ) external whenNotPaused notBlacklisted(from) notBlacklisted(to) {
-        _transferWithAuthorization(from, to, value, validAfter, validBefore, nonce, signature);
+        _transferWithAuthorization(from, to, TFHE.asEuint32(value), validAfter, validBefore, nonce, signature);
     }
 
     /**
@@ -139,13 +142,13 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
     function receiveWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        bytes calldata value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
         bytes memory signature
     ) external whenNotPaused notBlacklisted(from) notBlacklisted(to) {
-        _receiveWithAuthorization(from, to, value, validAfter, validBefore, nonce, signature);
+        _receiveWithAuthorization(from, to, TFHE.asEuint32(value), validAfter, validBefore, nonce, signature);
     }
 
     /**
@@ -171,9 +174,9 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
      * @param _account         The address of the account.
      * @param _shouldBlacklist True if the account should be blacklisted, false if the account should be unblacklisted.
      */
-    function _setBlacklistState(address _account, bool _shouldBlacklist) internal override {
+    function _setBlacklistState(address _account, bool _shouldBlacklist) internal override {            // @changed 255 -> 31
         balanceAndBlacklistStates[_account] = _shouldBlacklist
-            ? balanceAndBlacklistStates[_account] | (1 << 255)
+            ? TFHE.or(balanceAndBlacklistStates[_account], TFHE.asEuint32(1 << 31))
             : _balanceOf(_account);
     }
 
@@ -186,8 +189,8 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
      * @param _account The address of the account.
      * @param _balance The new fiat token balance of the account (max: (2^255 - 1)).
      */
-    function _setBalance(address _account, uint256 _balance) internal override {
-        require(_balance <= ((1 << 255) - 1), "FiatTokenV2_2: Balance exceeds (2^255 - 1)");
+    function _setBalance(address _account, euint32 _balance) internal override {        // @changed 255 -> 31
+        require(TFHE.decrypt(TFHE.le(_balance, TFHE.asEuint32((1 << 31) - 1))), "FiatTokenV2_2: Balance exceeds (2^31 - 1)");
         require(!_isBlacklisted(_account), "FiatTokenV2_2: Account is blacklisted");
 
         balanceAndBlacklistStates[_account] = _balance;
@@ -196,8 +199,8 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
     /**
      * @inheritdoc Blacklistable
      */
-    function _isBlacklisted(address _account) internal view override returns (bool) {
-        return balanceAndBlacklistStates[_account] >> 255 == 1;
+    function _isBlacklisted(address _account) internal view override returns (bool) {   // @changed 255 -> 31
+        return TFHE.decrypt(TFHE.eq(TFHE.shr(balanceAndBlacklistStates[_account], TFHE.asEuint8(31)), 1));
     }
 
     /**
@@ -208,15 +211,15 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
      * @param _account  The address of the account.
      * @return          The fiat token balance of the account.
      */
-    function _balanceOf(address _account) internal view override returns (uint256) {
-        return balanceAndBlacklistStates[_account] & ((1 << 255) - 1);
+    function _balanceOf(address _account) internal view override returns (euint32) {    // @changed 255 -> 31
+        return TFHE.and(balanceAndBlacklistStates[_account], TFHE.asEuint32((1 << 31) - 1));
     }
 
     /**
      * @inheritdoc FiatTokenV1
      */
-    function approve(address spender, uint256 value) external override(FiatTokenV1, IERC20) whenNotPaused returns (bool) {
-        _approve(msg.sender, spender, value);
+    function approve(address spender, bytes calldata value) external override(FiatTokenV1, IEncryptedERC20) whenNotPaused returns (bool) {
+        _approve(msg.sender, spender, TFHE.asEuint32(value));
         return true;
     }
 
@@ -226,28 +229,28 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
     function permit(
         address owner,
         address spender,
-        uint256 value,
+        bytes calldata value,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) external override whenNotPaused {
-        _permit(owner, spender, value, deadline, v, r, s);
+        _permit(owner, spender, TFHE.asEuint32(value), deadline, v, r, s);
     }
 
     /**
      * @inheritdoc FiatTokenV2
      */
-    function increaseAllowance(address spender, uint256 increment) external override whenNotPaused returns (bool) {
-        _increaseAllowance(msg.sender, spender, increment);
+    function increaseAllowance(address spender, bytes calldata increment) external override whenNotPaused returns (bool) {
+        _increaseAllowance(msg.sender, spender, TFHE.asEuint32(increment));
         return true;
     }
 
     /**
      * @inheritdoc FiatTokenV2
      */
-    function decreaseAllowance(address spender, uint256 decrement) external override whenNotPaused returns (bool) {
-        _decreaseAllowance(msg.sender, spender, decrement);
+    function decreaseAllowance(address spender, bytes calldata decrement) external override whenNotPaused returns (bool) {
+        _decreaseAllowance(msg.sender, spender, TFHE.asEuint32(decrement));
         return true;
     }
 }

@@ -19,9 +19,11 @@
 pragma solidity 0.8.20;
 
 import { AbstractFiatTokenV1 } from "../v1/AbstractFiatTokenV1.sol";
+import "fhevm/lib/TFHE.sol";
+
 
 abstract contract AbstractFiatTokenV2 is AbstractFiatTokenV1 {
-    function _increaseAllowance(address owner, address spender, uint256 increment) internal virtual;
+    function _increaseAllowance(address owner, address spender, euint32 increment) internal virtual;
 
-    function _decreaseAllowance(address owner, address spender, uint256 decrement) internal virtual;
+    function _decreaseAllowance(address owner, address spender, euint32 decrement) internal virtual;
 }

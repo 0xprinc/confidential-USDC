@@ -22,7 +22,8 @@ import { FiatTokenV1_1 } from "../v1.1/FiatTokenV1_1.sol";
 import { EIP712 } from "../util/EIP712.sol";
 import { EIP3009 } from "./EIP3009.sol";
 import { EIP2612 } from "./EIP2612.sol";
-// import "fhevm/lib/TFHE.sol";
+import "fhevm/lib/TFHE.sol";
+
 
 /**
  * @title FiatToken V2
@@ -51,9 +52,9 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
      */
     function increaseAllowance(
         address spender,
-        uint256 increment
+        bytes calldata increment
     ) external virtual whenNotPaused notBlacklisted(msg.sender) notBlacklisted(spender) returns (bool) {
-        _increaseAllowance(msg.sender, spender, increment);
+        _increaseAllowance(msg.sender, spender, TFHE.asEuint32(increment));
         return true;
     }
 
@@ -65,9 +66,9 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
      */
     function decreaseAllowance(
         address spender,
-        uint256 decrement
+        bytes calldata decrement
     ) external virtual whenNotPaused notBlacklisted(msg.sender) notBlacklisted(spender) returns (bool) {
-        _decreaseAllowance(msg.sender, spender, decrement);
+        _decreaseAllowance(msg.sender, spender, TFHE.asEuint32(decrement));
         return true;
     }
 
@@ -86,7 +87,7 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
     function transferWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        bytes calldata value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
@@ -94,7 +95,7 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
         bytes32 r,
         bytes32 s
     ) external whenNotPaused notBlacklisted(from) notBlacklisted(to) {
-        _transferWithAuthorization(from, to, value, validAfter, validBefore, nonce, v, r, s);
+        _transferWithAuthorization(from, to, TFHE.asEuint32(value), validAfter, validBefore, nonce, v, r, s);
     }
 
     /**
@@ -114,7 +115,7 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
     function receiveWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        bytes calldata value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
@@ -122,7 +123,7 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
         bytes32 r,
         bytes32 s
     ) external whenNotPaused notBlacklisted(from) notBlacklisted(to) {
-        _receiveWithAuthorization(from, to, value, validAfter, validBefore, nonce, v, r, s);
+        _receiveWithAuthorization(from, to, TFHE.asEuint32(value), validAfter, validBefore, nonce, v, r, s);
     }
 
     /**
@@ -157,13 +158,13 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
     function permit(
         address owner,
         address spender,
-        uint256 value,
+        bytes calldata value,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) external virtual whenNotPaused notBlacklisted(owner) notBlacklisted(spender) {
-        _permit(owner, spender, value, deadline, v, r, s);
+        _permit(owner, spender, TFHE.asEuint32(value), deadline, v, r, s);
     }
 
     /**
@@ -172,8 +173,8 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
      * @param spender   Spender's address
      * @param increment Amount of increase
      */
-    function _increaseAllowance(address owner, address spender, uint256 increment) internal override {
-        _approve(owner, spender, allowed[owner][spender] + increment);
+    function _increaseAllowance(address owner, address spender, euint32 increment) internal override {
+        _approve(owner, spender, TFHE.add(allowed[owner][spender], increment));
     }
 
     /**
@@ -182,7 +183,7 @@ contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
      * @param spender   Spender's address
      * @param decrement Amount of decrease
      */
-    function _decreaseAllowance(address owner, address spender, uint256 decrement) internal override {
-        _approve(owner, spender, allowed[owner][spender] - decrement);
+    function _decreaseAllowance(address owner, address spender, euint32 decrement) internal override {
+        _approve(owner, spender, TFHE.sub(allowed[owner][spender], decrement));
     }
 }

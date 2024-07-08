@@ -22,6 +22,8 @@ import { AbstractFiatTokenV2 } from "./AbstractFiatTokenV2.sol";
 import { EIP712Domain } from "./EIP712Domain.sol";
 import { SignatureChecker } from "../util/SignatureChecker.sol";
 import { MessageHashUtils } from "../util/MessageHashUtils.sol";
+import "fhevm/lib/TFHE.sol";
+
 
 /**
  * @title EIP-3009
@@ -77,7 +79,7 @@ abstract contract EIP3009 is AbstractFiatTokenV2, EIP712Domain {
     function _transferWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        euint32 value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
@@ -102,7 +104,7 @@ abstract contract EIP3009 is AbstractFiatTokenV2, EIP712Domain {
     function _transferWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        euint32 value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
@@ -138,7 +140,7 @@ abstract contract EIP3009 is AbstractFiatTokenV2, EIP712Domain {
     function _receiveWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        euint32 value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
@@ -165,7 +167,7 @@ abstract contract EIP3009 is AbstractFiatTokenV2, EIP712Domain {
     function _receiveWithAuthorization(
         address from,
         address to,
-        uint256 value,
+        euint32 value,
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,

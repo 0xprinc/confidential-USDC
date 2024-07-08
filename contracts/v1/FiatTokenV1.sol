@@ -23,6 +23,7 @@ import { AbstractFiatTokenV1 } from "./AbstractFiatTokenV1.sol";
 import { Ownable } from "./Ownable.sol";
 import { Pausable } from "./Pausable.sol";
 import { Blacklistable } from "./Blacklistable.sol";
+import "fhevm/lib/TFHE.sol";
 
 /**
  * @title FiatToken
@@ -41,15 +42,15 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
     /// @dev A mapping that stores the balance and blacklist states for a given address.
     /// The first bit defines whether the address is blacklisted (1 if blacklisted, 0 otherwise).
     /// The last 255 bits define the balance for the address.
-    mapping(address => uint256) internal balanceAndBlacklistStates;
-    mapping(address => mapping(address => uint256)) internal allowed;
-    uint256 internal totalSupply_ = 0;
+    mapping(address => euint32) internal balanceAndBlacklistStates;
+    mapping(address => mapping(address => euint32)) internal allowed;
+    euint32 internal totalSupply_;
     mapping(address => bool) internal minters;
-    mapping(address => uint256) internal minterAllowed;
+    mapping(address => euint32) internal minterAllowed;
 
-    event Mint(address indexed minter, address indexed to, uint256 amount);
-    event Burn(address indexed burner, uint256 amount);
-    event MinterConfigured(address indexed minter, uint256 minterAllowedAmount);
+    event Mint(address indexed minter, address indexed to, euint32 amount);
+    event Burn(address indexed burner, euint32 amount);
+    event MinterConfigured(address indexed minter, euint32 minterAllowedAmount);
     event MinterRemoved(address indexed oldMinter);
     event MasterMinterChanged(address indexed newMasterMinter);
 
@@ -102,23 +103,24 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
     /**
      * @notice Mints fiat tokens to an address.
      * @param _to The address that will receive the minted tokens.
-     * @param _amount The amount of tokens to mint. Must be less than or equal
+     * @param amount The amount of tokens to mint. Must be less than or equal
      * to the minterAllowance of the caller.
      * @return True if the operation was successful.
      */
     function mint(
         address _to,
-        uint256 _amount
+        bytes calldata amount
     ) external whenNotPaused onlyMinters notBlacklisted(msg.sender) notBlacklisted(_to) returns (bool) {
+        euint32 _amount = TFHE.asEuint32(amount);
         require(_to != address(0), "FiatToken: mint to the zero address");
-        require(_amount > 0, "FiatToken: mint amount not greater than 0");
+        require(TFHE.decrypt(TFHE.gt(_amount , TFHE.asEuint32(0))), "FiatToken: mint amount not greater than 0");
 
-        uint256 mintingAllowedAmount = minterAllowed[msg.sender];
-        require(_amount <= mintingAllowedAmount, "FiatToken: mint amount exceeds minterAllowance");
+        euint32 mintingAllowedAmount = minterAllowed[msg.sender];
+        require(TFHE.decrypt(TFHE.le(_amount,mintingAllowedAmount)), "FiatToken: mint amount exceeds minterAllowance");
 
-        totalSupply_ = totalSupply_.add(_amount);
-        _setBalance(_to, _balanceOf(_to).add(_amount));
-        minterAllowed[msg.sender] = mintingAllowedAmount.sub(_amount);
+        totalSupply_ = TFHE.add(totalSupply_,_amount);
+        _setBalance(_to, TFHE.add(_balanceOf(_to),_amount));
+        minterAllowed[msg.sender] = TFHE.sub(mintingAllowedAmount,_amount);
         emit Mint(msg.sender, _to, _amount);
         emit Transfer(address(0), _to, _amount);
         return true;
@@ -137,7 +139,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param minter The address to check.
      * @return The remaining minter allowance for the account.
      */
-    function minterAllowance(address minter) external view returns (uint256) {
+    function minterAllowance(address minter) external view returns (euint32) {
         return minterAllowed[minter];
     }
 
@@ -157,7 +159,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param spender The spender's address.
      * @return The remaining allowance.
      */
-    function allowance(address owner, address spender) external view override returns (uint256) {
+    function allowance(address owner, address spender) external view override returns (euint32) {
         return allowed[owner][spender];
     }
 
@@ -165,7 +167,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @notice Gets the totalSupply of the fiat token.
      * @return The totalSupply of the fiat token.
      */
-    function totalSupply() external view override returns (uint256) {
+    function totalSupply() external view override returns (euint32) {
         return totalSupply_;
     }
 
@@ -174,7 +176,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param account  The address to check.
      * @return balance The fiat token balance of the account.
      */
-    function balanceOf(address account) external view override returns (uint256) {
+    function balanceOf(address account) external view override returns (euint32) {
         return _balanceOf(account);
     }
 
@@ -186,9 +188,9 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      */
     function approve(
         address spender,
-        uint256 value
+        bytes calldata value
     ) external virtual override whenNotPaused notBlacklisted(msg.sender) notBlacklisted(spender) returns (bool) {
-        _approve(msg.sender, spender, value);
+        _approve(msg.sender, spender, TFHE.asEuint32(value));
         return true;
     }
 
@@ -198,7 +200,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param spender   Spender's address.
      * @param value     Allowance amount.
      */
-    function _approve(address owner, address spender, uint256 value) internal override {
+    function _approve(address owner, address spender, euint32 value) internal override {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
         allowed[owner][spender] = value;
@@ -210,13 +212,13 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @dev The caller must have some fiat token allowance on the payer's tokens.
      * @param from  Payer's address.
      * @param to    Payee's address.
-     * @param value Transfer amount.
+     * @param _value Transfer amount.
      * @return True if the operation was successful.
      */
     function transferFrom(
         address from,
         address to,
-        uint256 value
+        bytes calldata _value
     )
         external
         override
@@ -226,9 +228,10 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
         notBlacklisted(to)
         returns (bool)
     {
-        require(value <= allowed[from][msg.sender], "ERC20: transfer amount exceeds allowance");
+        euint32 value = TFHE.asEuint32(_value);
+        require(TFHE.decrypt(TFHE.le(value,allowed[from][msg.sender])), "ERC20: transfer amount exceeds allowance");
         _transfer(from, to, value);
-        allowed[from][msg.sender] = allowed[from][msg.sender].sub(value);
+        allowed[from][msg.sender] = TFHE.sub(allowed[from][msg.sender], value);
         return true;
     }
 
@@ -240,9 +243,9 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      */
     function transfer(
         address to,
-        uint256 value
+        bytes calldata value
     ) external override whenNotPaused notBlacklisted(msg.sender) notBlacklisted(to) returns (bool) {
-        _transfer(msg.sender, to, value);
+        _transfer(msg.sender, to, TFHE.asEuint32(value));
         return true;
     }
 
@@ -252,13 +255,13 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param to    Payee's address.
      * @param value Transfer amount.
      */
-    function _transfer(address from, address to, uint256 value) internal override {
+    function _transfer(address from, address to, euint32 value) internal override {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
-        require(value <= _balanceOf(from), "ERC20: transfer amount exceeds balance");
+        require(TFHE.decrypt(TFHE.le(value,_balanceOf(from))), "ERC20: transfer amount exceeds balance");
 
-        _setBalance(from, _balanceOf(from).sub(value));
-        _setBalance(to, _balanceOf(to).add(value));
+        _setBalance(from, TFHE.sub(_balanceOf(from), value));
+        _setBalance(to, TFHE.add(_balanceOf(to), value));
         emit Transfer(from, to, value);
     }
 
@@ -270,11 +273,11 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      */
     function configureMinter(
         address minter,
-        uint256 minterAllowedAmount
+        bytes calldata minterAllowedAmount
     ) external whenNotPaused onlyMasterMinter returns (bool) {
         minters[minter] = true;
-        minterAllowed[minter] = minterAllowedAmount;
-        emit MinterConfigured(minter, minterAllowedAmount);
+        minterAllowed[minter] = TFHE.asEuint32(minterAllowedAmount);
+        emit MinterConfigured(minter, TFHE.asEuint32(minterAllowedAmount));
         return true;
     }
 
@@ -285,7 +288,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      */
     function removeMinter(address minter) external onlyMasterMinter returns (bool) {
         minters[minter] = false;
-        minterAllowed[minter] = 0;
+        minterAllowed[minter] = TFHE.asEuint32(0);
         emit MinterRemoved(minter);
         return true;
     }
@@ -296,15 +299,16 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * should be less than or equal to the account's balance.
      * @param _amount the amount of tokens to be burned.
      */
-    function burn(uint256 _amount) external whenNotPaused onlyMinters notBlacklisted(msg.sender) {
-        uint256 balance = _balanceOf(msg.sender);
-        require(_amount > 0, "FiatToken: burn amount not greater than 0");
-        require(balance >= _amount, "FiatToken: burn amount exceeds balance");
+    function burn(bytes calldata _amount) external whenNotPaused onlyMinters notBlacklisted(msg.sender) {
+        euint32 balance = _balanceOf(msg.sender);
+        euint32 amount = TFHE.asEuint32(_amount);
+        require(TFHE.decrypt(TFHE.gt(amount, 0)), "FiatToken: burn amount not greater than 0");
+        require(TFHE.decrypt(TFHE.ge(balance ,amount)), "FiatToken: burn amount exceeds balance");
 
-        totalSupply_ = totalSupply_.sub(_amount);
-        _setBalance(msg.sender, balance.sub(_amount));
-        emit Burn(msg.sender, _amount);
-        emit Transfer(msg.sender, address(0), _amount);
+        totalSupply_ = TFHE.sub(totalSupply_, amount);
+        _setBalance(msg.sender, TFHE.sub(balance, amount));
+        emit Burn(msg.sender, amount);
+        emit Transfer(msg.sender, address(0), amount);
     }
 
     /**
@@ -345,7 +349,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param _account The address of the account.
      * @param _balance The new fiat token balance of the account.
      */
-    function _setBalance(address _account, uint256 _balance) internal virtual {
+    function _setBalance(address _account, euint32 _balance) internal virtual {
         balanceAndBlacklistStates[_account] = _balance;
     }
 
@@ -361,7 +365,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param _account  The address of the account.
      * @return          The fiat token balance of the account.
      */
-    function _balanceOf(address _account) internal view virtual returns (uint256) {
+    function _balanceOf(address _account) internal view virtual returns (euint32) {
         return balanceAndBlacklistStates[_account];
     }
 }

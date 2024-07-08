@@ -19,6 +19,8 @@
 pragma solidity 0.8.20;
 
 import { FiatTokenV2 } from "./FiatTokenV2.sol";
+import "fhevm/lib/TFHE.sol";
+
 
 // solhint-disable func-name-mixedcase
 
@@ -35,8 +37,8 @@ contract FiatTokenV2_1 is FiatTokenV2 {
         // solhint-disable-next-line reason-string
         require(_initializedVersion == 1);
 
-        uint256 lockedAmount = _balanceOf(address(this));
-        if (lockedAmount > 0) {
+        euint32 lockedAmount = _balanceOf(address(this));
+        if (TFHE.decrypt(TFHE.gt(lockedAmount, 0))) {
             _transfer(address(this), lostAndFound, lockedAmount);
         }
         _blacklist(address(this));

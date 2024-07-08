@@ -22,6 +22,9 @@ import { AbstractFiatTokenV2 } from "./AbstractFiatTokenV2.sol";
 import { EIP712Domain } from "./EIP712Domain.sol";
 import { MessageHashUtils } from "../util/MessageHashUtils.sol";
 import { SignatureChecker } from "../util/SignatureChecker.sol";
+import "fhevm/lib/TFHE.sol";
+
+
 
 /**
  * @title EIP-2612
@@ -55,7 +58,7 @@ abstract contract EIP2612 is AbstractFiatTokenV2, EIP712Domain {
     function _permit(
         address owner,
         address spender,
-        uint256 value,
+        euint32 value,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -73,7 +76,7 @@ abstract contract EIP2612 is AbstractFiatTokenV2, EIP712Domain {
      * @param deadline   The time at which the signature expires (unix time), or max uint256 value to signal no expiration
      * @param signature  Signature byte array signed by an EOA wallet or a contract wallet
      */
-    function _permit(address owner, address spender, uint256 value, uint256 deadline, bytes memory signature) internal {
+    function _permit(address owner, address spender, euint32 value, uint256 deadline, bytes memory signature) internal {
         require(deadline == type(uint256).max || deadline >= block.timestamp, "FiatTokenV2: permit is expired");
 
         bytes32 typedDataHash = MessageHashUtils.toTypedDataHash(

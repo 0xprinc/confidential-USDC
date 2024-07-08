@@ -19,9 +19,11 @@
 pragma solidity 0.8.20;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IEncryptedERC20 } from "../interface/IEncryptedERC20.sol";
+import "fhevm/lib/TFHE.sol";
 
-abstract contract AbstractFiatTokenV1 is IERC20 {
-    function _approve(address owner, address spender, uint256 value) internal virtual;
+abstract contract AbstractFiatTokenV1 is IEncryptedERC20 {
+    function _approve(address owner, address spender, euint32 value) internal virtual;
 
-    function _transfer(address from, address to, uint256 value) internal virtual;
+    function _transfer(address from, address to, euint32 value) internal virtual;
 }
