@@ -24,12 +24,13 @@ import { Ownable } from "./Ownable.sol";
 import { Pausable } from "./Pausable.sol";
 import { Blacklistable } from "./Blacklistable.sol";
 import "fhevm/lib/TFHE.sol";
+import "fhevm/abstracts/EIP712WithModifier.sol";
 
 /**
  * @title FiatToken
  * @dev ERC20 Token backed by fiat reserves
  */
-contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
+contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, EIP712WithModifier {
     using SafeMath for uint256;
 
     string public name;
@@ -41,7 +42,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
 
     /// @dev A mapping that stores the balance and blacklist states for a given address.
     /// The first bit defines whether the address is blacklisted (1 if blacklisted, 0 otherwise).
-    /// The last 255 bits define the balance for the address.
+    /// The last 31 bits define the balance for the address.
     mapping(address => euint32) internal balanceAndBlacklistStates;
     mapping(address => mapping(address => euint32)) internal allowed;
     euint32 internal totalSupply_;
@@ -53,6 +54,8 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
     event MinterConfigured(address indexed minter, euint32 minterAllowedAmount);
     event MinterRemoved(address indexed oldMinter);
     event MasterMinterChanged(address indexed newMasterMinter);
+
+    constructor() EIP712WithModifier("Authorization token", "1") {}
 
     /**
      * @notice Initializes the fiat token contract.
@@ -139,8 +142,9 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param minter The address to check.
      * @return The remaining minter allowance for the account.
      */
-    function minterAllowance(address minter) external view returns (euint32) {
-        return minterAllowed[minter];
+    function minterAllowance(bytes32 publicKey, bytes calldata signature, address minter) external view onlySignedPublicKey(publicKey, signature) returns (bytes memory) {
+        require(minter == msg.sender || minter == owner());
+        return TFHE.reencrypt(minterAllowed[minter], publicKey, 0);
     }
 
     /**
@@ -155,20 +159,27 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
     /**
      * @notice Gets the remaining amount of fiat tokens a spender is allowed to transfer on
      * behalf of the token owner.
-     * @param owner   The token owner's address.
+     * @param publicKey  publicKey of fhEVM instance
+     * @param signature  signature of privateKey holder of fhEVM instance
      * @param spender The spender's address.
      * @return The remaining allowance.
      */
-    function allowance(address owner, address spender) external view override returns (euint32) {
-        return allowed[owner][spender];
+    function allowance(bytes32 publicKey, bytes calldata signature, address spender) external view onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
+        address owner = msg.sender;
+
+        return TFHE.reencrypt(allowed[owner][spender], publicKey);
     }
 
     /**
      * @notice Gets the totalSupply of the fiat token.
      * @return The totalSupply of the fiat token.
      */
-    function totalSupply() external view override returns (euint32) {
-        return totalSupply_;
+    function totalSupply(
+        bytes32 publicKey, 
+        bytes calldata signature) external view 
+        onlyOwner 
+        onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
+        return TFHE.reencrypt(totalSupply_, publicKey);
     }
 
     /**
@@ -176,8 +187,9 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
      * @param account  The address to check.
      * @return balance The fiat token balance of the account.
      */
-    function balanceOf(address account) external view override returns (euint32) {
-        return _balanceOf(account);
+    function balanceOf(bytes32 publicKey, bytes calldata signature, address account) external view onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
+        require(msg.sender == account || msg.sender == owner(), "FiatToken: caller is not the account owner");
+        return TFHE.reencrypt(_balanceOf(account), publicKey, 0);
     }
 
     /**

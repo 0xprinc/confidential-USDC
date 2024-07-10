@@ -36,7 +36,7 @@ pragma solidity 0.8.20;
  */
 contract Ownable {
     // Owner of the contract
-    address private _owner;
+    address internal _owner;
 
     /**
      * @dev Event to show ownership has been transferred
@@ -56,7 +56,7 @@ contract Ownable {
      * @dev Tells the address of the owner
      * @return the address of the owner
      */
-    function owner() external view returns (address) {
+    function owner() public view returns (address) {
         return _owner;
     }
 

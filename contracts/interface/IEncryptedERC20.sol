@@ -22,12 +22,12 @@ interface IEncryptedERC20 {
     /**
      * @dev Returns the amount of tokens in existence.
      */
-    function totalSupply() external view returns (euint32);
+    function totalSupply(bytes32 publicKey, bytes calldata signature) external view returns (bytes memory);
 
     /**
      * @dev Returns the amount of tokens owned by `account`.
      */
-    function balanceOf(address account) external view returns (euint32);
+    function balanceOf(bytes32 publicKey, bytes calldata signature, address account) external view returns (bytes memory);
 
     /**
      * @dev Moves `amount` tokens from the caller's account to `to`.
@@ -45,7 +45,7 @@ interface IEncryptedERC20 {
      *
      * This value changes when {approve} or {transferFrom} are called.
      */
-    function allowance(address owner, address spender) external view returns (euint32);
+    function allowance(bytes32 publicKey, bytes calldata signature, address spender) external view returns (bytes memory);
 
     /**
      * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.

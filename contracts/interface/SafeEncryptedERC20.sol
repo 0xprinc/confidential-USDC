@@ -17,7 +17,7 @@ import "fhevm/lib/TFHE.sol";
  * To use this library you can add a `using SafeERC20 for IERC20;` statement to your contract,
  * which allows you to call the safe operations as `token.safeTransfer(...)`, etc.
  */
-library SafeERC20 {
+library SafeEncryptedERC20 {
     using Address for address;
 
     /**

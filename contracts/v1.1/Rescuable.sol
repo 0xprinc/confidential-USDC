@@ -19,11 +19,11 @@
 pragma solidity 0.8.20;
 
 import { Ownable } from "../v1/Ownable.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IEncryptedERC20 } from "../interface/IEncryptedERC20.sol";
+import { SafeEncryptedERC20 } from "../interface/SafeEncryptedERC20.sol";
 
 contract Rescuable is Ownable {
-    using SafeERC20 for IERC20;
+    using SafeEncryptedERC20 for IEncryptedERC20;
 
     address private _rescuer;
 
@@ -52,7 +52,7 @@ contract Rescuable is Ownable {
      * @param amount    Amount to withdraw
      */
     function rescueERC20(
-        IERC20 tokenContract,
+        IEncryptedERC20 tokenContract,
         address to,
         uint256 amount
     ) external onlyRescuer {
