@@ -270,6 +270,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
     function _transfer(address from, address to, euint32 value) internal override {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
+        require(TFHE.decrypt(TFHE.gt(value, 0)), "ERC20: transfer amount not greater than 0");
         require(TFHE.decrypt(TFHE.le(value,_balanceOf(from))), "ERC20: transfer amount exceeds balance");
 
         _setBalance(from, TFHE.sub(_balanceOf(from), value));
