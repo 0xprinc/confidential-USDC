@@ -30,7 +30,7 @@ import "fhevm/lib/TFHE.sol";
  * @title EIP-2612
  * @notice Provide internal implementation for gas-abstracted approvals
  */
-abstract contract EIP2612 is AbstractFiatTokenV2, EIP712Domain {
+abstract contract EIP2612 is AbstractFiatTokenV2, EIP712Domain, SignatureChecker {
     // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
     bytes32 public constant PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
 
@@ -83,7 +83,7 @@ abstract contract EIP2612 is AbstractFiatTokenV2, EIP712Domain {
             _domainSeparator(),
             keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, _permitNonces[owner]++, deadline))
         );
-        require(SignatureChecker.isValidSignatureNow(owner, typedDataHash, signature), "EIP2612: invalid signature");
+        require(isValidSignatureNow(owner, typedDataHash, signature), "EIP2612: invalid signature");
 
         _approve(owner, spender, value);
     }

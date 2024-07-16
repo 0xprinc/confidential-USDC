@@ -27,7 +27,7 @@ import { IERC1271 } from "../interface/IERC1271.sol";
  *
  * Adapted from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/21bb89ef5bfc789b9333eb05e3ba2b7b284ac77c/contracts/utils/cryptography/SignatureChecker.sol
  */
-library SignatureChecker {
+contract SignatureChecker {
     /**
      * @dev Checks if a signature is valid for a given signer and data hash. If the signer is a smart contract, the
      * signature is validated against that smart contract using ERC1271, otherwise it's validated using `ECRecover.recover`.
@@ -35,7 +35,7 @@ library SignatureChecker {
      * @param digest        Keccak-256 hash digest of the signed message
      * @param signature     Signature byte array associated with hash
      */
-    function isValidSignatureNow(address signer, bytes32 digest, bytes memory signature) external view returns (bool) {
+    function isValidSignatureNow(address signer, bytes32 digest, bytes memory signature) public view returns (bool) {
         if (!isContract(signer)) {
             return ECRecover.recover(digest, signature) == signer;
         }

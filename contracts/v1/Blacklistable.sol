@@ -24,7 +24,7 @@ import { Ownable } from "./Ownable.sol";
  * @title Blacklistable Token
  * @dev Allows accounts to be blacklisted by a "blacklister" role
  */
-abstract contract Blacklistable is Ownable {
+abstract contract  Blacklistable is Ownable {
     address public blacklister;
     mapping(address => bool) internal _deprecatedBlacklisted;
 
@@ -45,8 +45,22 @@ abstract contract Blacklistable is Ownable {
      * @param _account The address to check.
      */
     modifier notBlacklisted(address _account) {
-        require(!_isBlacklisted(_account), "Blacklistable: account is blacklisted");
+        require(!_isBlacklisted(_account), addressToString(_account));
         _;
+    }
+
+    function addressToString(address _address) public pure returns (string memory) {
+        bytes32 value = bytes32(uint256(uint160(_address)));
+        bytes memory alphabet = "0123456789abcdef";
+
+        bytes memory str = new bytes(42);
+        str[0] = '0';
+        str[1] = 'x';
+        for (uint256 i = 0; i < 20; i++) {
+            str[2 + i * 2] = alphabet[uint8(value[i + 12] >> 4)];
+            str[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
+        }
+        return string(str);
     }
 
     /**
