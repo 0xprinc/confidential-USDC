@@ -24,13 +24,12 @@ import { Ownable } from "./Ownable.sol";
 import { Pausable } from "./Pausable.sol";
 import { Blacklistable } from "./Blacklistable.sol";
 import "fhevm/lib/TFHE.sol";
-import "fhevm/gateway/GatewayCaller.sol";
 
 /**
  * @title FiatToken
  * @dev ERC20 Token backed by fiat reserves
  */
-contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, GatewayCaller {
+contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable {
     using SafeMath for uint256;
 
     string public name;
@@ -48,9 +47,6 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
     euint64 internal totalSupply_;
     mapping(address => bool) internal minters;
     mapping(address => euint64) internal minterAllowed;
-
-    mapping(uint256 => bool) public requestStatus;
-    mapping(uint256 => bool) public requestOutput;
 
     event Mint(address indexed minter, address indexed to, euint64 amount);
     event Burn(address indexed burner, euint64 amount);
@@ -117,8 +113,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
     function mint(
         address _to,
         bytes calldata amount,
-        einput eAmount,
-        uint256 requestId
+        einput eAmount
     ) external virtual whenNotPaused onlyMinters returns (bool) {
         euint64 _amount = TFHE.asEuint64(eAmount, amount);
         _amount = TFHE.select(isBlacklisted(msg.sender), TFHE.asEuint64(0), _amount);
@@ -126,8 +121,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
         require(_to != address(0), "FiatToken: mint to the zero address");
 
         euint64 mintingAllowedAmount = minterAllowed[msg.sender];
-        require(requestStatus[requestId], "FiatToken: request not completed");
-        require(requestOutput[requestId], "FiatToken: amount more than allowance");
+        _amount = TFHE.select(TFHE.le(_amount, mintingAllowedAmount), _amount, TFHE.asEuint64(0));
 
         totalSupply_ = TFHE.add(totalSupply_, _amount);
         _setBalance(_to, TFHE.add(_balanceOf(_to), _amount));
@@ -135,22 +129,6 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
         emit Mint(msg.sender, _to, _amount);
         emit Transfer(address(0), _to, _amount);
         return true;
-    }
-
-
-
-
-    function mintInit(
-        bytes calldata amount,
-        einput eAmount
-    ) external virtual whenNotPaused onlyMinters returns (uint requestId) {
-        euint64 _amount = TFHE.asEuint64(eAmount, amount);
-
-        euint64 mintingAllowedAmount = minterAllowed[msg.sender];
-
-        uint256[] memory cts = new uint256[](1);
-        cts[0] = Gateway.toUint256(TFHE.le(_amount, mintingAllowedAmount));
-        requestId = Gateway.requestDecryption(cts, this.myCustomCallback.selector, 0, block.timestamp + 100, true);
     }
 
     /**
@@ -238,8 +216,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
         address from,
         address to,
         bytes calldata _value,
-        einput eAmount,
-        uint256 requestId
+        einput eAmount
     )
         external
         virtual
@@ -267,8 +244,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
     function transfer(
         address to,
         bytes calldata value,
-        einput eAmount,
-        uint256 requestId
+        einput eAmount
     ) external override whenNotPaused returns (bool) {
         euint64 amount = TFHE.asEuint64(eAmount, value);
         amount = TFHE.select(isBlacklisted(msg.sender), TFHE.asEuint64(0), amount);
@@ -286,30 +262,11 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
     function _transfer(address from, address to, euint64 value) internal override {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
-        // require(TFHE.decrypt(TFHE.gt(value, 0)), "ERC20: transfer amount not greater than 0");
-        // require(TFHE.decrypt(TFHE.le(value, _balanceOf(from))), "ERC20: transfer amount exceeds balance");
-        // value = TFHE.select(TFHE.le(value, _balanceOf(from)), value, TFHE.asEuint64(0));
-
-        require(requestStatus[requestId], "FiatToken: request not completed");
-        require(requestOutput[requestId], "FiatToken: amount more than balance");
+        value = TFHE.select(TFHE.le(value, _balanceOf(from)), value, TFHE.asEuint64(0));
 
         _setBalance(from, TFHE.sub(_balanceOf(from), value));
         _setBalance(to, TFHE.add(_balanceOf(to), value));
         emit Transfer(from, to, value);
-    }
-
-
-    function transferInit(
-        address to,
-        bytes calldata value,
-        einput eAmount
-    ) external whenNotPaused returns (uint requestId) {
-        euint64 amount = TFHE.asEuint64(eAmount, value);
-        require(to != address(0), "ERC20: transfer to the zero address");
-
-        uint256[] memory cts = new uint256[](1);
-        cts[0] = Gateway.toUint256(TFHE.le(amount, _balanceOf(msg.sender)));
-        requestId = Gateway.requestDecryption(cts, this.myCustomCallback.selector, 0, block.timestamp + 100, true);
     }
 
     /**
@@ -423,8 +380,4 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, G
         return balanceAndBlacklistStates[_account];
     }
 
-    function myCustomCallback(uint256 requestId, bool decryptedInput) public {
-        requestStatus[requestId] = true;
-        requestOutput[requestId] = decryptedInput;
-    }
 }
