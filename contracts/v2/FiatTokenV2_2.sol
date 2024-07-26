@@ -254,4 +254,9 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
         _decreaseAllowance(msg.sender, spender, TFHE.asEuint32(decrement));
         return true;
     }
+
+
+    function checkBlacklisted(address _account) internal view returns (bool) {   // @changed 255 -> 31
+        return TFHE.decrypt(TFHE.eq(TFHE.shr(balanceAndBlacklistStates[_account], TFHE.asEuint8(31)), 1));
+    }
 }
