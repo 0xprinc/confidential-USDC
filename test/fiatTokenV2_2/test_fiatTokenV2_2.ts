@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 import { createInstances } from "../instance";
 import { getSigners } from "../signers";
 import { createTransaction } from "../utils";
-import { deployUSDC } from "./USDC.fixture";
+import { deployUSDC } from "./test_fiatTokenV2_2.fixture";
 // import { InitializeCalldataStruct, StrategyStruct } from "../../types";
 import { assert } from "console";
 import fhevmjs, { FhevmInstance } from "fhevmjs";
@@ -51,8 +51,8 @@ describe("USDC", function () {
 
   {
     console.log("\n\ 2) Initializing USDC contract \n");
+
     
-    // console.log("owner before initialize: " + await contractSpace.owner());
     try {
       const txn = await contractUSDC.initialize(
         "USDC",
@@ -95,13 +95,7 @@ describe("USDC", function () {
       // Handle the error appropriately (e.g., retry, notify user)
     }
 
-    console.log(this.signers.bob.getAddress());
-    console.log(this.signers.alice.getAddress());
-    console.log(this.signers.carol.getAddress());
 
-    console.log(await contractUSDC.isBlacklisted(this.signers.bob.getAddress()));
-    console.log(await contractUSDC.isBlacklisted(this.signers.alice.getAddress()));
-    console.log(await contractUSDC.isBlacklisted(this.signers.carol.getAddress()));
 
     try {
       const txn = await contractUSDC.connect(this.signers.bob).mint(
@@ -145,6 +139,7 @@ describe("USDC", function () {
       // Handle the error appropriately (e.g., retry, notify user)
     }
 
+
     try {
       const txn = await contractUSDC.connect(this.signers.carol).transferFrom(
         this.signers.bob.getAddress(),
@@ -186,6 +181,7 @@ describe("USDC", function () {
       // Handle the error appropriately (e.g., retry, notify user)
     }
     
+
     try {
       const txn = await contractUSDC.connect(this.signers.carol).burn(
         fhevmInstance.bob.encrypt32(100000),        // 1e5 USDC

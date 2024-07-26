@@ -113,7 +113,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
     function mint(
         address _to,
         bytes calldata amount
-    ) external whenNotPaused onlyMinters notBlacklisted(msg.sender) notBlacklisted(_to) returns (bool) {
+    ) external  virtual whenNotPaused onlyMinters notBlacklisted(msg.sender) notBlacklisted(_to) returns (bool) {
         euint32 _amount = TFHE.asEuint32(amount);
         require(_to != address(0), "FiatToken: mint to the zero address");
         require(TFHE.decrypt(TFHE.gt(_amount , TFHE.asEuint32(0))), "FiatToken: mint amount not greater than 0");
@@ -233,6 +233,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
         bytes calldata _value
     )
         external
+        virtual 
         override
         whenNotPaused
         notBlacklisted(msg.sender)
@@ -312,7 +313,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
      * should be less than or equal to the account's balance.
      * @param _amount the amount of tokens to be burned.
      */
-    function burn(bytes calldata _amount) external whenNotPaused onlyMinters notBlacklisted(msg.sender) {
+    function burn(bytes calldata _amount) external virtual whenNotPaused onlyMinters notBlacklisted(msg.sender) {
         euint32 balance = _balanceOf(msg.sender);
         euint32 amount = TFHE.asEuint32(_amount);
         require(TFHE.decrypt(TFHE.gt(amount, 0)), "FiatToken: burn amount not greater than 0");

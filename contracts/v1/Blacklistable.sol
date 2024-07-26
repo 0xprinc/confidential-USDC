@@ -26,7 +26,7 @@ import { Ownable } from "./Ownable.sol";
  */
 abstract contract  Blacklistable is Ownable {
     address public blacklister;
-    mapping(address => bool) internal _deprecatedBlacklisted;
+    mapping(address => bool) public _deprecatedBlacklisted;
 
     event Blacklisted(address indexed _account);
     event UnBlacklisted(address indexed _account);
@@ -45,7 +45,8 @@ abstract contract  Blacklistable is Ownable {
      * @param _account The address to check.
      */
     modifier notBlacklisted(address _account) {
-        require(!_isBlacklisted(_account), addressToString(_account));
+        bool a = isBlacklisted(_account);
+        require(!a, addressToString(_account));
         _;
     }
 
@@ -63,12 +64,44 @@ abstract contract  Blacklistable is Ownable {
         return string(str);
     }
 
+    function boolToString(bool _value) internal pure returns (string memory) {
+        return _value ? "true" : "false";
+    }
+
+    function uintToString(uint256 _value) internal pure returns (string memory) {
+        // Return "0" for value 0
+        if (_value == 0) {
+            return "0";
+        }
+
+        // Determine the length of the string representation of the value
+        uint256 temp = _value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+
+        // Create a buffer for the string representation
+        bytes memory buffer = new bytes(digits);
+        while (_value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + _value % 10));
+            _value /= 10;
+        }
+
+        return string(buffer);
+    }
+
+
+
+
     /**
      * @notice Checks if account is blacklisted.
      * @param _account The address to check.
      * @return True if the account is blacklisted, false if the account is not blacklisted.
      */
-    function isBlacklisted(address _account) external view returns (bool) {
+    function isBlacklisted(address _account) public view returns (bool) {
         return _isBlacklisted(_account);
     }
 

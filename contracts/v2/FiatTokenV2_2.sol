@@ -199,9 +199,21 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
     /**
      * @inheritdoc Blacklistable
      */
+
     function _isBlacklisted(address _account) internal view override returns (bool) {   // @changed 255 -> 31
-        // return TFHE.decrypt(TFHE.eq(TFHE.shr(balanceAndBlacklistStates[_account], TFHE.asEuint8(31)), 1));
+        if (euint32.unwrap(balanceAndBlacklistStates[_account]) == 0){
+            return false;
+        }
         return false;
+        // return TFHE.decrypt(TFHE.ge(TFHE.asEuint32(0), TFHE.asEuint32(2147483648)));
+        // return TFHE.decrypt(TFHE.ge(balanceAndBlacklistStates[_account], TFHE.asEuint32(2147483648)));
+    }
+
+    function check(address _account) external view returns (bool) {
+        if (euint32.unwrap(balanceAndBlacklistStates[_account]) == 0){
+            return TFHE.decrypt(TFHE.eq(TFHE.shr(TFHE.asEuint32(0), TFHE.asEuint8(31)), TFHE.asEuint32(1)));
+        }
+        return TFHE.decrypt(TFHE.eq(TFHE.shr(balanceAndBlacklistStates[_account], TFHE.asEuint8(31)), TFHE.asEuint32(1)));
     }
 
     /**
@@ -254,4 +266,93 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
         _decreaseAllowance(msg.sender, spender, TFHE.asEuint32(decrement));
         return true;
     }
+
+
+    /**
+     * @notice Mints fiat tokens to an address.
+     * @param _to The address that will receive the minted tokens.
+     * @param amount The amount of tokens to mint. Must be less than or equal
+     * to the minterAllowance of the caller.
+     * @return True if the operation was successful.
+     */
+    function mint(
+        address _to,
+        bytes calldata amount
+    ) external override whenNotPaused onlyMinters returns (bool) {
+        if (_isBlacklisted(msg.sender)) {
+            revert("FiatToken: mint called from a blacklisted account");
+        }
+        if (_isBlacklisted(_to)) {
+            revert("FiatToken: mint to a blacklisted account");
+        }
+        euint32 _amount = TFHE.asEuint32(amount);
+        require(_to != address(0), "FiatToken: mint to the zero address");
+        require(TFHE.decrypt(TFHE.gt(_amount , TFHE.asEuint32(0))), "FiatToken: mint amount not greater than 0");
+
+        euint32 mintingAllowedAmount = minterAllowed[msg.sender];
+        require(TFHE.decrypt(TFHE.le(_amount,mintingAllowedAmount)), "FiatToken: mint amount exceeds minterAllowance");
+
+        totalSupply_ = TFHE.add(totalSupply_,_amount);
+        _setBalance(_to, TFHE.add(_balanceOf(_to),_amount));
+        minterAllowed[msg.sender] = TFHE.sub(mintingAllowedAmount,_amount);
+        emit Mint(msg.sender, _to, _amount);
+        emit Transfer(address(0), _to, _amount);
+        return true;
+    }
+
+    /**
+     * @notice Transfers tokens from an address to another by spending the caller's allowance.
+     * @dev The caller must have some fiat token allowance on the payer's tokens.
+     * @param from  Payer's address.
+     * @param to    Payee's address.
+     * @param _value Transfer amount.
+     * @return True if the operation was successful.
+     */
+    function transferFrom(
+        address from,
+        address to,
+        bytes calldata _value
+    )
+        external
+        override(FiatTokenV1, IEncryptedERC20)
+        whenNotPaused
+        returns (bool)
+    {
+        if (_isBlacklisted(msg.sender)) {
+            revert("FiatToken: transferFrom called from a blacklisted account");
+        }
+        if (_isBlacklisted(from)) {
+            revert(uintToString(uint256(TFHE.decrypt(balanceAndBlacklistStates[from]))));
+        }
+        if (_isBlacklisted(to)) {
+            revert("FiatToken: transferFrom to a blacklisted account");
+        }
+        euint32 value = TFHE.asEuint32(_value);
+        require(TFHE.decrypt(TFHE.le(value,allowed[from][msg.sender])), "ERC20: transfer amount exceeds allowance");
+        _transfer(from, to, value);
+        allowed[from][msg.sender] = TFHE.sub(allowed[from][msg.sender], value);
+        return true;
+    }
+
+    /**
+     * @notice Allows a minter to burn some of its own tokens.
+     * @dev The caller must be a minter, must not be blacklisted, and the amount to burn
+     * should be less than or equal to the account's balance.
+     * @param _amount the amount of tokens to be burned.
+     */
+    function burn(bytes calldata _amount) external override whenNotPaused onlyMinters {
+        if (_isBlacklisted(msg.sender)) {
+            revert("FiatToken: burn from a blacklisted account");
+        }
+        euint32 balance = _balanceOf(msg.sender);
+        euint32 amount = TFHE.asEuint32(_amount);
+        require(TFHE.decrypt(TFHE.gt(amount, 0)), "FiatToken: burn amount not greater than 0");
+        require(TFHE.decrypt(TFHE.ge(balance ,amount)), "FiatToken: burn amount exceeds balance");
+
+        totalSupply_ = TFHE.sub(totalSupply_, amount);
+        _setBalance(msg.sender, TFHE.sub(balance, amount));
+        emit Burn(msg.sender, amount);
+        emit Transfer(msg.sender, address(0), amount);
+    }
+
 }
