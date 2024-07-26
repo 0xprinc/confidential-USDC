@@ -95,14 +95,6 @@ describe("USDC", function () {
       // Handle the error appropriately (e.g., retry, notify user)
     }
 
-    console.log(this.signers.bob.getAddress());
-    console.log(this.signers.alice.getAddress());
-    console.log(this.signers.carol.getAddress());
-
-    console.log(await contractUSDC.isBlacklisted(this.signers.bob.getAddress()));
-    console.log(await contractUSDC.isBlacklisted(this.signers.alice.getAddress()));
-    console.log(await contractUSDC.isBlacklisted(this.signers.carol.getAddress()));
-
     try {
       const txn = await contractUSDC.connect(this.signers.bob).mint(
         this.signers.bob.getAddress(),
