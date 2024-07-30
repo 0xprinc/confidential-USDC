@@ -26,5 +26,5 @@ import { Rescuable } from "./Rescuable.sol";
  * @dev ERC20 Token backed by fiat reserves
  */
 contract FiatTokenV1_1 is FiatTokenV1, Rescuable {
-
+    constructor(address _originalToken) FiatTokenV1(_originalToken) {}
 }

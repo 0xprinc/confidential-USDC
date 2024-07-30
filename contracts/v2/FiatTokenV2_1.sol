@@ -29,6 +29,9 @@ import "fhevm/lib/TFHE.sol";
  * @notice ERC20 Token backed by fiat reserves, version 2.1
  */
 contract FiatTokenV2_1 is FiatTokenV2 {
+
+    constructor(address _originalToken) FiatTokenV2(_originalToken) {}
+    
     /**
      * @notice Initialize v2.1
      * @param lostAndFound  The address to which the locked funds are sent

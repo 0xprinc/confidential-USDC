@@ -25,6 +25,7 @@ import { Pausable } from "./Pausable.sol";
 import { Blacklistable } from "./Blacklistable.sol";
 import "fhevm/lib/TFHE.sol";
 import "fhevm/abstracts/EIP712WithModifier.sol";
+import {OriginalToken} from "contracts/OriginalToken.sol";
 
 /**
  * @title FiatToken
@@ -40,6 +41,8 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
     address public masterMinter;
     bool internal initialized;
 
+    OriginalToken public originalToken;
+
     /// @dev A mapping that stores the balance and blacklist states for a given address.
     /// The first bit defines whether the address is blacklisted (1 if blacklisted, 0 otherwise).
     /// The last 31 bits define the balance for the address.
@@ -48,14 +51,18 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
     euint32 internal totalSupply_;
     mapping(address => bool) internal minters;
     mapping(address => euint32) internal minterAllowed;
+    mapping(address => bool) public delegateViewer;
 
-    event Mint(address indexed minter, address indexed to, euint32 amount);
+    event mint(address indexed minter, address indexed to, euint32 amount);
     event Burn(address indexed burner, euint32 amount);
     event MinterConfigured(address indexed minter, euint32 minterAllowedAmount);
     event MinterRemoved(address indexed oldMinter);
     event MasterMinterChanged(address indexed newMasterMinter);
 
-    constructor() EIP712WithModifier("Authorization token", "1") {}
+    constructor(address _originalToken) EIP712WithModifier("Authorization token", "1") {
+        originalToken = OriginalToken(_originalToken);
+        delegateViewer[msg.sender] = true;
+    }
 
     /**
      * @notice Initializes the fiat token contract.
@@ -95,37 +102,14 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
         initialized = true;
     }
 
-    /**
-     * @dev Throws if called by any account other than a minter.
-     */
-    modifier onlyMinters() {
-        require(minters[msg.sender], "FiatToken: caller is not a minter");
-        _;
-    }
-
-    /**
-     * @notice Mints fiat tokens to an address.
-     * @param _to The address that will receive the minted tokens.
-     * @param amount The amount of tokens to mint. Must be less than or equal
-     * to the minterAllowance of the caller.
-     * @return True if the operation was successful.
-     */
-    function mint(
-        address _to,
-        bytes calldata amount
-    ) external whenNotPaused onlyMinters notBlacklisted(msg.sender) notBlacklisted(_to) returns (bool) {
+    function wrap(uint256 amount) external whenNotPaused notBlacklisted(msg.sender) returns (bool) {
+        require(amount > 0);
         euint32 _amount = TFHE.asEuint32(amount);
-        require(_to != address(0), "FiatToken: mint to the zero address");
-        require(TFHE.decrypt(TFHE.gt(_amount , TFHE.asEuint32(0))), "FiatToken: mint amount not greater than 0");
-
-        euint32 mintingAllowedAmount = minterAllowed[msg.sender];
-        require(TFHE.decrypt(TFHE.le(_amount,mintingAllowedAmount)), "FiatToken: mint amount exceeds minterAllowance");
-
+        originalToken.transferFrom(msg.sender, address(this), amount);
         totalSupply_ = TFHE.add(totalSupply_,_amount);
-        _setBalance(_to, TFHE.add(_balanceOf(_to),_amount));
-        minterAllowed[msg.sender] = TFHE.sub(mintingAllowedAmount,_amount);
-        emit Mint(msg.sender, _to, _amount);
-        emit Transfer(address(0), _to, _amount);
+        _setBalance(msg.sender, TFHE.add(_balanceOf(msg.sender),_amount));
+        emit mint(msg.sender, msg.sender, _amount);
+        emit Transfer(address(0), msg.sender, _amount);
         return true;
     }
 
@@ -188,8 +172,12 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
      * @return balance The fiat token balance of the account.
      */
     function balanceOf(bytes32 publicKey, bytes calldata signature, address account) external view onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
-        require(msg.sender == account || msg.sender == owner(), "FiatToken: caller is not the account owner");
+        require(msg.sender == account || delegateViewer[msg.sender], "FiatToken: caller is not the account owner");
         return TFHE.reencrypt(_balanceOf(account), publicKey, 0);
+    }
+
+    function delegateViewerStatus(address account, bool status) external onlyOwner {
+        delegateViewer[account] = status;
     }
 
     /**
@@ -279,47 +267,19 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
     }
 
     /**
-     * @notice Adds or updates a new minter with a mint allowance.
-     * @param minter The address of the minter.
-     * @param minterAllowedAmount The minting amount allowed for the minter.
-     * @return True if the operation was successful.
-     */
-    function configureMinter(
-        address minter,
-        bytes calldata minterAllowedAmount
-    ) external whenNotPaused onlyMasterMinter returns (bool) {
-        minters[minter] = true;
-        minterAllowed[minter] = TFHE.asEuint32(minterAllowedAmount);
-        emit MinterConfigured(minter, TFHE.asEuint32(minterAllowedAmount));
-        return true;
-    }
-
-    /**
-     * @notice Removes a minter.
-     * @param minter The address of the minter to remove.
-     * @return True if the operation was successful.
-     */
-    function removeMinter(address minter) external onlyMasterMinter returns (bool) {
-        minters[minter] = false;
-        minterAllowed[minter] = TFHE.asEuint32(0);
-        emit MinterRemoved(minter);
-        return true;
-    }
-
-    /**
      * @notice Allows a minter to burn some of its own tokens.
      * @dev The caller must be a minter, must not be blacklisted, and the amount to burn
      * should be less than or equal to the account's balance.
      * @param _amount the amount of tokens to be burned.
      */
-    function burn(bytes calldata _amount) external whenNotPaused onlyMinters notBlacklisted(msg.sender) {
+    function unwrap(uint256 _amount) external whenNotPaused notBlacklisted(msg.sender) {
         euint32 balance = _balanceOf(msg.sender);
         euint32 amount = TFHE.asEuint32(_amount);
-        require(TFHE.decrypt(TFHE.gt(amount, 0)), "FiatToken: burn amount not greater than 0");
-        require(TFHE.decrypt(TFHE.ge(balance ,amount)), "FiatToken: burn amount exceeds balance");
-
+        require(_amount > 0);
+        require(TFHE.decrypt(TFHE.le(amount, balance)), "FiatToken: burn amount exceeds balance");
         totalSupply_ = TFHE.sub(totalSupply_, amount);
         _setBalance(msg.sender, TFHE.sub(balance, amount));
+        originalToken.transfer(msg.sender, _amount);
         emit Burn(msg.sender, amount);
         emit Transfer(msg.sender, address(0), amount);
     }

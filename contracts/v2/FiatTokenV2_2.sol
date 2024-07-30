@@ -36,6 +36,10 @@ import "fhevm/lib/TFHE.sol";
  * @notice ERC20 Token backed by fiat reserves, version 2.2
  */
 contract FiatTokenV2_2 is FiatTokenV2_1 {
+
+
+    constructor(address _originalToken) FiatTokenV2_1(_originalToken) {}
+    
     /**
      * @notice Initialize v2.2
      * @param accountsToBlacklist   A list of accounts to migrate from the old blacklist

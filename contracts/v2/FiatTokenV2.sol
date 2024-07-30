@@ -32,6 +32,8 @@ import "fhevm/lib/TFHE.sol";
 contract FiatTokenV2 is FiatTokenV1_1, EIP3009, EIP2612 {
     uint8 internal _initializedVersion;
 
+    constructor(address _originalToken) FiatTokenV1_1(_originalToken) {}
+
     /**
      * @notice Initialize v2
      * @param newName   New token name
