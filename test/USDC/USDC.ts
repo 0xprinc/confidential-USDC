@@ -35,6 +35,7 @@ describe("USDC", function () {
     const addressAlice = this.signers.alice.getAddress();
     const addressBob = this.signers.bob.getAddress();
     const addressCarol = this.signers.carol.getAddress();
+    const addressDave = this.signers.dave.getAddress();
 
     let fhevmInstance = await createInstances(addresscUSDC, ethers, this.signers);
 
@@ -198,6 +199,24 @@ describe("USDC", function () {
     let carolBalance = await contract_cUSDC.connect(this.signers.carol).balanceOf(tokenCarol.publicKey, tokenCarol.signature, this.signers.carol.getAddress());
     console.log("Carol's balance: " + fhevmInstance.carol.decrypt(addresscUSDC, carolBalance));
 
+    try {
+      const txn = await contract_cUSDC.connect(this.signers.alice).delegateViewerStatus(
+        await this.signers.dave.getAddress(),
+        true
+      );
+      console.log("Transaction hash:", txn.hash);
+    
+      // Wait for 1 confirmation (adjust confirmations as needed)
+      await txn.wait(1);
+      console.log("delegating the viewing rights to dave successful!");
+    } catch (error) {
+      console.error("Transaction failed:", error);
+      // Handle the error appropriately (e.g., retry, notify user)
+    }
+
+    console.log("dave trying to view the balance of carol");
+    let carolBalance2 = await contract_cUSDC.connect(this.signers.dave).balanceOf(tokenDave.publicKey, tokenDave.signature, this.signers.carol.getAddress());
+    console.log("Carol's balance when dave is trying to fetch it: " + fhevmInstance.dave.decrypt(addresscUSDC, carolBalance2));
 
   }
 
