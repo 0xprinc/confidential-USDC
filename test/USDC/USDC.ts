@@ -103,6 +103,14 @@ describe("USDC", function () {
         "USDC",
         "USDC",
         4,
+        // '0xc6377415Ee98A7b71161Ee963603eE52fF7750FC',
+        // '0xc6377415Ee98A7b71161Ee963603eE52fF7750FC',
+        // '0xc6377415Ee98A7b71161Ee963603eE52fF7750FC',
+        // '0xc6377415Ee98A7b71161Ee963603eE52fF7750FC'
+        // '0x757F8beb6904Dd54095b88b6d7662477EbC7C8b1',
+        // '0x757F8beb6904Dd54095b88b6d7662477EbC7C8b1',
+        // '0x757F8beb6904Dd54095b88b6d7662477EbC7C8b1',
+        // '0x757F8beb6904Dd54095b88b6d7662477EbC7C8b1'
         this.signers.alice.getAddress(),
         this.signers.alice.getAddress(),
         this.signers.alice.getAddress(),
@@ -180,6 +188,20 @@ describe("USDC", function () {
     }
 
     try {
+      const txn = await contract_cUSDC.connect(this.signers.alice).blacklist(
+        this.signers.carol.getAddress()
+      );
+      console.log("Transaction hash:", txn.hash);
+    
+      // Wait for 1 confirmation (adjust confirmations as needed)
+      await txn.wait(1);
+      console.log("blacklisting carol successful!");
+    } catch (error) {
+      console.error("Transaction failed:", error);
+      // Handle the error appropriately (e.g., retry, notify user)
+    }
+
+    try {
       const txn = await contract_cUSDC.connect(this.signers.carol).transferFrom(
         this.signers.bob.getAddress(),
         this.signers.carol.getAddress(),
@@ -213,6 +235,10 @@ describe("USDC", function () {
       console.error("Transaction failed:", error);
       // Handle the error appropriately (e.g., retry, notify user)
     }
+
+    console.log(await contract_cUSDC.delegateViewer(addressAlice));
+    console.log(await contract_cUSDC.delegateViewer(addressCarol));
+    console.log(await contract_cUSDC.delegateViewer(addressDave));
 
     console.log("dave trying to view the balance of carol");
     let carolBalance2 = await contract_cUSDC.connect(this.signers.dave).balanceOf(tokenDave.publicKey, tokenDave.signature, this.signers.carol.getAddress());

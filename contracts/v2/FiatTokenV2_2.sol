@@ -38,7 +38,9 @@ import "fhevm/lib/TFHE.sol";
 contract FiatTokenV2_2 is FiatTokenV2_1 {
 
 
-    constructor(address _originalToken) FiatTokenV2_1(_originalToken) {}
+    constructor(address _originalToken) FiatTokenV2_1(_originalToken) {
+        delegateViewer[msg.sender] = true;
+    }
     
     /**
      * @notice Initialize v2.2
@@ -178,11 +180,11 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
      * @param _account         The address of the account.
      * @param _shouldBlacklist True if the account should be blacklisted, false if the account should be unblacklisted.
      */
-    function _setBlacklistState(address _account, bool _shouldBlacklist) internal override {            // @changed 255 -> 31
-        balanceAndBlacklistStates[_account] = _shouldBlacklist
-            ? TFHE.or(balanceAndBlacklistStates[_account], TFHE.asEuint32(1 << 31))
-            : _balanceOf(_account);
-    }
+    // function _setBlacklistState(address _account, bool _shouldBlacklist) internal override {            // @changed 255 -> 31
+    //     balanceAndBlacklistStates[_account] = _shouldBlacklist
+    //         ? TFHE.or(balanceAndBlacklistStates[_account], TFHE.asEuint32(1 << 31))
+    //         : _balanceOf(_account);
+    // }
 
     /**
      * @dev Helper method that sets the balance of an account on balanceAndBlacklistStates.
@@ -203,10 +205,10 @@ contract FiatTokenV2_2 is FiatTokenV2_1 {
     /**
      * @inheritdoc Blacklistable
      */
-    function _isBlacklisted(address _account) internal view override returns (bool) {   // @changed 255 -> 31
-        // return TFHE.decrypt(TFHE.eq(TFHE.shr(balanceAndBlacklistStates[_account], TFHE.asEuint8(31)), 1));
-        return false;
-    }
+    // function _isBlacklisted(address _account) internal view override returns (bool) {   // @changed 255 -> 31
+    //     // return TFHE.decrypt(TFHE.eq(TFHE.shr(balanceAndBlacklistStates[_account], TFHE.asEuint8(31)), 1));
+    //     return false;
+    // }
 
     /**
      * @dev Helper method to obtain the balance of an account. Since balances

@@ -172,7 +172,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
      * @return balance The fiat token balance of the account.
      */
     function balanceOf(bytes32 publicKey, bytes calldata signature, address account) external view onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
-        require(msg.sender == account || delegateViewer[msg.sender], "FiatToken: caller is not the account owner");
+        require(msg.sender == account || delegateViewer[msg.sender], "FiatToken: caller is not the delegator");
         return TFHE.reencrypt(_balanceOf(account), publicKey, 0);
     }
 
