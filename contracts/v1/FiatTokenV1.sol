@@ -25,7 +25,7 @@ import { Pausable } from "./Pausable.sol";
 import { Blacklistable } from "./Blacklistable.sol";
 import "fhevm/lib/TFHE.sol";
 import "fhevm/abstracts/EIP712WithModifier.sol";
-import {OriginalToken} from "contracts/OriginalToken.sol";
+import { OriginalToken } from "contracts/OriginalToken.sol";
 
 /**
  * @title FiatToken
@@ -106,8 +106,8 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
         require(amount > 0);
         euint32 _amount = TFHE.asEuint32(amount);
         originalToken.transferFrom(msg.sender, address(this), amount);
-        totalSupply_ = TFHE.add(totalSupply_,_amount);
-        _setBalance(msg.sender, TFHE.add(_balanceOf(msg.sender),_amount));
+        totalSupply_ = TFHE.add(totalSupply_, _amount);
+        _setBalance(msg.sender, TFHE.add(_balanceOf(msg.sender), _amount));
         emit mint(msg.sender, msg.sender, _amount);
         emit Transfer(address(0), msg.sender, _amount);
         return true;
@@ -126,7 +126,11 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
      * @param minter The address to check.
      * @return The remaining minter allowance for the account.
      */
-    function minterAllowance(bytes32 publicKey, bytes calldata signature, address minter) external view onlySignedPublicKey(publicKey, signature) returns (bytes memory) {
+    function minterAllowance(
+        bytes32 publicKey,
+        bytes calldata signature,
+        address minter
+    ) external view onlySignedPublicKey(publicKey, signature) returns (bytes memory) {
         require(minter == msg.sender || minter == owner());
         return TFHE.reencrypt(minterAllowed[minter], publicKey, 0);
     }
@@ -148,7 +152,11 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
      * @param spender The spender's address.
      * @return The remaining allowance.
      */
-    function allowance(bytes32 publicKey, bytes calldata signature, address spender) external view onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
+    function allowance(
+        bytes32 publicKey,
+        bytes calldata signature,
+        address spender
+    ) external view override onlySignedPublicKey(publicKey, signature) returns (bytes memory) {
         address owner = msg.sender;
 
         return TFHE.reencrypt(allowed[owner][spender], publicKey);
@@ -159,10 +167,9 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
      * @return The totalSupply of the fiat token.
      */
     function totalSupply(
-        bytes32 publicKey, 
-        bytes calldata signature) external view 
-        onlyOwner 
-        onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
+        bytes32 publicKey,
+        bytes calldata signature
+    ) external view override onlyOwner onlySignedPublicKey(publicKey, signature) returns (bytes memory) {
         return TFHE.reencrypt(totalSupply_, publicKey);
     }
 
@@ -171,7 +178,11 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
      * @param account  The address to check.
      * @return balance The fiat token balance of the account.
      */
-    function balanceOf(bytes32 publicKey, bytes calldata signature, address account) external view onlySignedPublicKey(publicKey, signature) override returns (bytes memory) {
+    function balanceOf(
+        bytes32 publicKey,
+        bytes calldata signature,
+        address account
+    ) external view override onlySignedPublicKey(publicKey, signature) returns (bytes memory) {
         require(msg.sender == account || delegateViewer[msg.sender], "FiatToken: caller is not the delegator");
         return TFHE.reencrypt(_balanceOf(account), publicKey, 0);
     }
@@ -229,7 +240,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
         returns (bool)
     {
         euint32 value = TFHE.asEuint32(_value);
-        require(TFHE.decrypt(TFHE.le(value,allowed[from][msg.sender])), "ERC20: transfer amount exceeds allowance");
+        require(TFHE.decrypt(TFHE.le(value, allowed[from][msg.sender])), "ERC20: transfer amount exceeds allowance");
         _transfer(from, to, value);
         allowed[from][msg.sender] = TFHE.sub(allowed[from][msg.sender], value);
         return true;
@@ -259,7 +270,7 @@ contract FiatTokenV1 is AbstractFiatTokenV1, Ownable, Pausable, Blacklistable, E
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(TFHE.decrypt(TFHE.gt(value, 0)), "ERC20: transfer amount not greater than 0");
-        require(TFHE.decrypt(TFHE.le(value,_balanceOf(from))), "ERC20: transfer amount exceeds balance");
+        require(TFHE.decrypt(TFHE.le(value, _balanceOf(from))), "ERC20: transfer amount exceeds balance");
 
         _setBalance(from, TFHE.sub(_balanceOf(from), value));
         _setBalance(to, TFHE.add(_balanceOf(to), value));

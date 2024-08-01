@@ -5,7 +5,7 @@ pragma solidity >=0.8.9 <0.9.0;
 import "fhevm/lib/TFHE.sol";
 
 interface IEncryptedERC20 {
-     /**
+    /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
      * another (`to`).
      *
@@ -27,7 +27,11 @@ interface IEncryptedERC20 {
     /**
      * @dev Returns the amount of tokens owned by `account`.
      */
-    function balanceOf(bytes32 publicKey, bytes calldata signature, address account) external view returns (bytes memory);
+    function balanceOf(
+        bytes32 publicKey,
+        bytes calldata signature,
+        address account
+    ) external view returns (bytes memory);
 
     /**
      * @dev Moves `amount` tokens from the caller's account to `to`.
@@ -45,7 +49,11 @@ interface IEncryptedERC20 {
      *
      * This value changes when {approve} or {transferFrom} are called.
      */
-    function allowance(bytes32 publicKey, bytes calldata signature, address spender) external view returns (bytes memory);
+    function allowance(
+        bytes32 publicKey,
+        bytes calldata signature,
+        address spender
+    ) external view returns (bytes memory);
 
     /**
      * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
